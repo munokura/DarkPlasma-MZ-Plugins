@@ -1,0 +1,317 @@
+// DarkPlasma_ComposePicture 1.1.3
+// Copyright (c) 2024 DarkPlasma
+// This software is released under the MIT license.
+// http://opensource.org/licenses/mit-license.php
+
+/**
+ * 2025/07/26 1.1.3 合成する画像の表示位置・拡大率の更新処理を通常のピクチャと分離
+ * 2025/02/02 1.1.2 ベース画像ロード完了時に合成する画像が1フレーム遅れて表示されることがある不具合を修正
+ * 2025/02/02 1.1.1 合成する画像のオフセット設定が想定と異なる不具合を修正
+ * 2024/04/13 1.1.0 画像ファイル名に制御文字を使用可能にする
+ * 2024/04/13 1.0.0 公開
+ */
+
+/*:
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+@plugindesc Combine images into one picture
+@author DarkPlasma
+@license MIT
+
+@help
+English Help Translator: munokura
+Please check the URL below for the latest version of the plugin.
+URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+-----
+
+Version: 1.1.3
+Provides a plugin command for compositing images into a single picture.
+
+This plugin adds picture compositing information to save data.
+
+@param startIdOfAdditionalPicture
+@text Picture ID start point of the image to be composited
+@desc Set the start point of the picture ID to be assigned to the image to be composited.
+@type number
+@default 10001
+@min 201
+
+@command composePicture
+@text Composite images
+@arg basePictureId
+@text Base Picture ID
+@desc The specified picture will be used as the base image.
+@type number
+@default 0
+@min 1
+@max 100
+
+@arg additionalImages
+@text Image to be composited
+@type struct<AdditionalImage>[]
+@default []
+*/
+
+/*:ja
+@plugindesc 画像を合成して1枚のピクチャとして扱う
+@author DarkPlasma
+@license MIT
+
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+
+@param startIdOfAdditionalPicture
+@desc 合成する画像に割り当てるピクチャIDの始点を設定します。
+@text 合成する画像のピクチャID始点
+@type number
+@min 201
+@default 10001
+
+@command composePicture
+@text 画像を合成する
+@arg basePictureId
+@desc 指定したピクチャをベース画像として扱います。
+@text ベースピクチャID
+@type number
+@max 100
+@min 1
+@default 0
+@arg additionalImages
+@text 合成する画像
+@type struct<AdditionalImage>[]
+@default []
+
+@help
+version: 1.1.3
+画像を合成して1枚のピクチャとして扱うプラグインコマンドを提供します。
+
+本プラグインはセーブデータにピクチャの合成情報を追加します。
+*/
+
+(() => {
+  'use strict';
+
+  const pluginName = document.currentScript.src.replace(/^.*\/(.*).js$/, function () {
+    return arguments[1];
+  });
+
+  const pluginParametersOf = (pluginName) => PluginManager.parameters(pluginName);
+
+  const pluginParameters = pluginParametersOf(pluginName);
+
+  const settings = {
+    startIdOfAdditionalPicture: Number(pluginParameters.startIdOfAdditionalPicture || 10001),
+  };
+
+  function parseArgs_composePicture(args) {
+    return {
+      basePictureId: Number(args.basePictureId || 0),
+      additionalImages: args.additionalImages
+        ? JSON.parse(args.additionalImages).map((e) => {
+            return e
+              ? ((parameter) => {
+                  const parsed = JSON.parse(parameter);
+                  return {
+                    name: String(parsed.name || ``),
+                    offsetX: Number(parsed.offsetX || 0),
+                    offsetY: Number(parsed.offsetY || 0),
+                    scaleX: Number(parsed.scaleX || 100),
+                    scaleY: Number(parsed.scaleY || 100),
+                    opacity: Number(parsed.opacity || 255),
+                    blendMode: Number(parsed.blendMode || 0),
+                  };
+                })(e)
+              : { name: '', offsetX: 0, offsetY: 0, scaleX: 100, scaleY: 100, opacity: 255, blendMode: 0 };
+          })
+        : [],
+    };
+  }
+
+  const command_composePicture = 'composePicture';
+
+  PluginManager.registerCommand(pluginName, command_composePicture, function (args) {
+    const parsedArgs = parseArgs_composePicture(args);
+    const basePicture = $gameScreen.picture(parsedArgs.basePictureId);
+    $gameScreen.composePicture(
+      parsedArgs.basePictureId,
+      parsedArgs.additionalImages.map((image) =>
+        $gameScreen.allocateAdditionalPicture(
+          `../${image.name}`, // picturesとして扱う
+          basePicture?.origin() || 0,
+          image.offsetX,
+          image.offsetY,
+          image.scaleX,
+          image.scaleY,
+          image.opacity,
+          image.blendMode,
+        ),
+      ),
+    );
+  });
+  function Game_Temp_ComposePictureMixIn(gameTemp) {
+    gameTemp.dummyWindow = function () {
+      if (!this._dummyWindow) {
+        this._dummyWindow = new Window_Base(new Rectangle(0, 0, 0, 0));
+      }
+      return this._dummyWindow;
+    };
+  }
+  Game_Temp_ComposePictureMixIn(Game_Temp.prototype);
+  function Game_Screen_ComposePictureMixIn(gameScreen) {
+    gameScreen.allocateAdditionalPicture = function (
+      name,
+      origin,
+      offsetX,
+      offsetY,
+      scaleX,
+      scaleY,
+      opacity,
+      blendMode,
+    ) {
+      const key = `${name}:${origin}:${offsetX}:${offsetY}:${scaleX}:${scaleY}:${opacity}:${blendMode}`;
+      if (!this._cachedAdditionalPictures) {
+        this._cachedAdditionalPictures = {};
+      }
+      if (this._cachedAdditionalPictures[key]) {
+        return this._cachedAdditionalPictures[key];
+      }
+      if (!this._additionalPictures) {
+        this._additionalPictures = {};
+      }
+      let pictureId = settings.startIdOfAdditionalPicture;
+      while (this._additionalPictures[++pictureId]);
+      const picture = new Game_AdditionalPicture();
+      picture.setPictureId(pictureId);
+      picture.show(name, origin, offsetX, offsetY, scaleX, scaleY, opacity, blendMode);
+      this._additionalPictures[pictureId] = picture;
+      this._cachedAdditionalPictures[key] = picture;
+      return picture;
+    };
+    gameScreen.composePicture = function (basePictureId, additionalPictures) {
+      const basePicture = this.picture(basePictureId);
+      if (basePicture) {
+        basePicture.composePicture(additionalPictures);
+        if (!this._composedPictures) {
+          this._composedPictures = {};
+        }
+        this._composedPictures[basePictureId] = additionalPictures;
+      }
+    };
+    const _picture = gameScreen.picture;
+    gameScreen.picture = function (pictureId) {
+      if (pictureId >= settings.startIdOfAdditionalPicture) {
+        return this._additionalPictures[pictureId];
+      }
+      return _picture.call(this, pictureId);
+    };
+    const _showPicture = gameScreen.showPicture;
+    gameScreen.showPicture = function (pictureId, name, origin, x, y, scaleX, scaleY, opacity, blendMode) {
+      _showPicture.call(this, pictureId, name, origin, x, y, scaleX, scaleY, opacity, blendMode);
+      if (!this._composedPictures) {
+        this._composedPictures = {};
+      }
+      if (!this._composedPictures[pictureId]) {
+        this._composedPictures[pictureId] = [];
+      }
+      /**
+       * ピクチャの表示を行うとGame_Pictureインスタンスが再生成されるため、保持した合成情報を復元する
+       */
+      const picture = this.picture(pictureId);
+      picture?.composePicture(this._composedPictures[pictureId]);
+    };
+  }
+  Game_Screen_ComposePictureMixIn(Game_Screen.prototype);
+  function Game_Picture_ComposePictureMixIn(gamePicture) {
+    gamePicture.composePicture = function (additionalPictures) {
+      this._additionalPictures = additionalPictures;
+    };
+    gamePicture.additionalPictures = function () {
+      return this._additionalPictures || [];
+    };
+  }
+  Game_Picture_ComposePictureMixIn(Game_Picture.prototype);
+  class Game_AdditionalPicture extends Game_Picture {
+    name() {
+      return $gameTemp.dummyWindow().convertEscapeCharacters(super.name());
+    }
+    setPictureId(id) {
+      this._pictureId = id;
+    }
+    pictureId() {
+      return this._pictureId;
+    }
+  }
+  function Sprite_Picture_ComposePictureMixIn(spritePicture) {
+    const _update = spritePicture.update;
+    spritePicture.update = function () {
+      _update.call(this);
+      this.updateCompose();
+    };
+    spritePicture.additionalPictureNames = function () {
+      return this.children
+        .filter((child) => child instanceof Sprite_Picture && child.picture() instanceof Game_AdditionalPicture)
+        .map((sprite) => sprite.picture().name());
+    };
+    spritePicture.mustBeComposed = function () {
+      const picture = this.picture();
+      if (!picture || picture.additionalPictures().length === 0) {
+        return false;
+      }
+      if (this._forceUpdateCompose) {
+        return true;
+      }
+      /**
+       * 設定されている被合成ピクチャ名一覧と、実際の被合成ピクチャ名一覧が順序含めて等しい場合は更新不要
+       */
+      return (
+        JSON.stringify(picture.additionalPictures().map((additionalPicture) => additionalPicture.name())) !==
+        JSON.stringify(this.additionalPictureNames())
+      );
+    };
+    spritePicture.updateCompose = function () {
+      if (this.mustBeComposed()) {
+        this.composePicture(
+          this.picture()
+            .additionalPictures()
+            .map((gamePicture) => {
+              const sprite = new Sprite_AdditionalPicture(gamePicture.pictureId());
+              sprite.update();
+              return sprite;
+            }),
+        );
+        this._forceUpdateCompose = false;
+      }
+    };
+    spritePicture.composePicture = function (spritePictures) {
+      this.removeChildren();
+      this._additionalSprites = spritePictures;
+      this._additionalSprites.forEach((sprite) => this.addChild(sprite));
+    };
+    const _loadBitmap = spritePicture.loadBitmap;
+    spritePicture.loadBitmap = function () {
+      _loadBitmap.call(this);
+      this.bitmap?.addLoadListener(() => {
+        this._forceUpdateCompose = true;
+        this.updateCompose();
+      });
+    };
+  }
+  Sprite_Picture_ComposePictureMixIn(Sprite_Picture.prototype);
+  class Sprite_AdditionalPicture extends Sprite_Picture {
+    updatePosition() {
+      const picture = this.picture();
+      if (picture) {
+        this.x = Math.round(picture.x());
+        this.y = Math.round(picture.y());
+      }
+    }
+    updateScale() {
+      const picture = this.picture();
+      if (picture) {
+        this.scale.x = picture.scaleX() / 100;
+        this.scale.y = picture.scaleY() / 100;
+      }
+    }
+  }
+  globalThis.Game_AdditionalPicture = Game_AdditionalPicture;
+})();

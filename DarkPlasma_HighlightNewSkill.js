@@ -1,0 +1,181 @@
+// DarkPlasma_HighlightNewSkill 1.1.0
+// Copyright (c) 2022 DarkPlasma
+// This software is released under the MIT license.
+// http://opensource.org/licenses/mit-license.php
+
+/**
+ * 2022/10/30 1.1.0 カーソル合わせた後、1操作待って強調解除するよう変更
+ *            1.0.0 公開
+ */
+
+/*:
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+@plugindesc Highlight newly acquired skills
+@author DarkPlasma
+@license MIT
+
+@help
+English Help Translator: munokura
+Please check the URL below for the latest version of the plugin.
+URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+-----
+
+Version: 1.1.0
+Newly acquired skills are highlighted in the skill list.
+The highlighting will return to its original color once you hover the cursor
+over them.
+
+This plugin adds the following to your save data:
+- A list of newly acquired skill IDs for each actor
+
+@param newSkillColor
+@text Skill Color
+@desc Specify the color number of the newly acquired skill.
+@type number
+@default 2
+
+@param highlightFirstSkills
+@text Emphasis on early skills
+@desc Whether to highlight the initial skills as newly acquired skills at the start of the game.
+@type boolean
+@default true
+*/
+
+/*:ja
+@plugindesc 新しく習得したスキルを強調表示する
+@author DarkPlasma
+@license MIT
+
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+
+@param newSkillColor
+@desc 新しく習得したスキルの色番号を指定します。
+@text スキル色
+@type number
+@default 2
+
+@param highlightFirstSkills
+@desc 初期スキルをゲーム開始時に新規習得スキルとして強調するかどうか。
+@text 初期スキル強調
+@type boolean
+@default true
+
+@help
+version: 1.1.0
+スキル一覧で、新しく習得したスキルを強調表示します。
+強調表示は一度カーソルを合わせると元の色に戻ります。
+
+本プラグインはセーブデータに以下を追加します。
+- アクターごとの新規習得スキルID一覧
+*/
+
+(() => {
+  'use strict';
+
+  const pluginName = document.currentScript.src.replace(/^.*\/(.*).js$/, function () {
+    return arguments[1];
+  });
+
+  const pluginParametersOf = (pluginName) => PluginManager.parameters(pluginName);
+
+  const pluginParameters = pluginParametersOf(pluginName);
+
+  const settings = {
+    newSkillColor: Number(pluginParameters.newSkillColor || 2),
+    highlightFirstSkills: String(pluginParameters.highlightFirstSkills || true) === 'true',
+  };
+
+  function Game_Actor_HighlightNewSkllMixIn(gameActor) {
+    const _initSkills = gameActor.initSkills;
+    gameActor.initSkills = function () {
+      _initSkills.call(this);
+      if (!settings.highlightFirstSkills) {
+        this._newSkillIds = [];
+      }
+    };
+    gameActor.newSkillIds = function () {
+      if (!this._newSkillIds) {
+        this._newSkillIds = [];
+      }
+      return this._newSkillIds;
+    };
+    gameActor.addNewSkill = function (skillId) {
+      this.newSkillIds().push(skillId);
+    };
+    gameActor.isNewSkill = function (skill) {
+      return this.newSkillIds().includes(skill.id);
+    };
+    gameActor.touchSkill = function (skill) {
+      this._newSkillIds = this.newSkillIds().filter((id) => id !== skill.id);
+    };
+    const _learnSkill = gameActor.learnSkill;
+    gameActor.learnSkill = function (skillId) {
+      if (!this.isLearnedSkill(skillId)) {
+        this.addNewSkill(skillId);
+      }
+      _learnSkill.call(this, skillId);
+    };
+  }
+  Game_Actor_HighlightNewSkllMixIn(Game_Actor.prototype);
+  function Window_SkillList_HighlightNewSkillMixIn(windowClass) {
+    const _initialize = windowClass.initialize;
+    windowClass.initialize = function (rect) {
+      _initialize.call(this, rect);
+      this._touchRequestedSkill = null;
+    };
+    windowClass.requestTouch = function (skill) {
+      this.processTouchRequest();
+      if (this.isNewSkill(skill)) {
+        this._touchRequestedSkill = {
+          skill: skill,
+          actor: this._actor,
+        };
+      }
+    };
+    windowClass.processTouchRequest = function () {
+      if (this._touchRequestedSkill) {
+        this._touchRequestedSkill.actor.touchSkill(this._touchRequestedSkill.skill);
+        this._touchRequestedSkill = null;
+        this.refresh();
+      }
+    };
+    const _processOk = windowClass.processOk;
+    windowClass.processOk = function () {
+      _processOk.call(this);
+      this.processTouchRequest();
+    };
+    const _processCancel = windowClass.processCancel;
+    windowClass.processCancel = function () {
+      _processCancel.call(this);
+      this.processTouchRequest();
+    };
+    const _drawItemName = windowClass.drawItemName;
+    windowClass.drawItemName = function (item, x, y, width) {
+      if (this.isNewSkill(item)) {
+        this.drawNewItemName(item, x, y, width);
+      } else {
+        _drawItemName.call(this, item, x, y, width);
+      }
+    };
+    windowClass.isNewSkill = function (skill) {
+      return !!skill && !!this._actor && DataManager.isSkill(skill) && this._actor.isNewSkill(skill);
+    };
+    windowClass.drawNewItemName = function (skill, x, y, width) {
+      const resetTextColor = this.resetTextColor;
+      this.resetTextColor = () => {};
+      this.changeTextColor(ColorManager.textColor(settings.newSkillColor));
+      _drawItemName.call(this, skill, x, y, width);
+      this.resetTextColor = resetTextColor;
+      this.resetTextColor();
+    };
+    const _select = windowClass.select;
+    windowClass.select = function (index) {
+      _select.call(this, index);
+      const skill = this.item();
+      this.requestTouch(skill);
+    };
+  }
+  Window_SkillList_HighlightNewSkillMixIn(Window_SkillList.prototype);
+})();

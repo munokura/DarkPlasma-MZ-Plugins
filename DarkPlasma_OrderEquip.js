@@ -1,0 +1,322 @@
+// DarkPlasma_OrderEquip 1.0.2
+// Copyright (c) 2022 DarkPlasma
+// This software is released under the MIT license.
+// http://opensource.org/licenses/mit-license.php
+
+/**
+ * 2023/04/02 1.0.2 typescript移行
+ * 2022/05/23 1.0.1 装備アイテム選択時の並び順に対応
+ * 2022/05/22 1.0.0 公開
+ */
+
+/*:
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+@plugindesc Specify the order of equipment
+@author DarkPlasma
+@license MIT
+
+@help
+English Help Translator: munokura
+Please check the URL below for the latest version of the plugin.
+URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+-----
+
+version: 1.0.2
+Specifies the sort order of weapons and armor.
+
+Displays weapons and armor according to the sort order specified in the plugin
+parameters.
+If used with DarkPlasma_OrderIdAlias and an ID is specified as the sort key,
+the OrderId will be used instead of the database ID.
+
+If using with the following plugins, add this below them.
+DarkPlasma_OrderIdAlias
+
+@param weaponSortKeys
+@text Weapon Order Key
+@type select[]
+@default ["id"]
+@option ID
+@value id
+@option Attack Power
+@value atk
+@option Defense power
+@value def
+@option magic power
+@value mat
+@option magic defense
+@value mdf
+@option agility
+@value agi
+@option luck
+@value luk
+@option Max HP
+@value mhp
+@option Max MP
+@value mmp
+@option price
+@value price
+@option Weapon Type
+@value wtypeId
+
+@param weaponOrder
+@text Weapon order
+@type select
+@default asc
+@option ascending order
+@value asc
+@option descending order
+@value desc
+
+@param armorSortKeys
+@text Armor order
+@type select[]
+@default ["id"]
+@option ID
+@value id
+@option Attack Power
+@value atk
+@option Defense power
+@value def
+@option magic power
+@value mat
+@option magic defense
+@value mdf
+@option agility
+@value agi
+@option luck
+@value luk
+@option Max HP
+@value mhp
+@option Max MP
+@value mmp
+@option price
+@value price
+@option Equipment Type
+@value etypeId
+@option Armor Type
+@value atypeId
+
+@param armorOrder
+@text Armor order
+@type select
+@default asc
+@option ascending order
+@value asc
+@option descending order
+@value desc
+*/
+
+/*:ja
+@plugindesc 装備の並び順を指定する
+@author DarkPlasma
+@license MIT
+
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+
+@orderAfter DarkPlasma_OrderIdAlias
+
+@param weaponSortKeys
+@text 武器の並び順キー
+@type select[]
+@option ID
+@value id
+@option 攻撃力
+@value atk
+@option 防御力
+@value def
+@option 魔法力
+@value mat
+@option 魔法防御
+@value mdf
+@option 敏捷性
+@value agi
+@option 運
+@value luk
+@option 最大HP
+@value mhp
+@option 最大MP
+@value mmp
+@option 価格
+@value price
+@option 武器タイプ
+@value wtypeId
+@default ["id"]
+
+@param weaponOrder
+@text 武器の並び順
+@type select
+@option 昇順
+@value asc
+@option 降順
+@value desc
+@default asc
+
+@param armorSortKeys
+@text 防具の並び順
+@type select[]
+@option ID
+@value id
+@option 攻撃力
+@value atk
+@option 防御力
+@value def
+@option 魔法力
+@value mat
+@option 魔法防御
+@value mdf
+@option 敏捷性
+@value agi
+@option 運
+@value luk
+@option 最大HP
+@value mhp
+@option 最大MP
+@value mmp
+@option 価格
+@value price
+@option 装備タイプ
+@value etypeId
+@option 防具タイプ
+@value atypeId
+@default ["id"]
+
+@param armorOrder
+@text 防具の並び順
+@type select
+@option 昇順
+@value asc
+@option 降順
+@value desc
+@default asc
+
+@help
+version: 1.0.2
+武器・防具の並び順を指定します。
+
+プラグインパラメータの並び順指定に従って表示します。
+DarkPlasma_OrderIdAliasとともに使用して並び順キーにIDを指定した場合、
+データベースのIDの代わりにOrderIdが使用されます。
+
+下記プラグインと共に利用する場合、それよりも下に追加してください。
+DarkPlasma_OrderIdAlias
+*/
+
+(() => {
+  'use strict';
+
+  const pluginName = document.currentScript.src.replace(/^.*\/(.*).js$/, function () {
+    return arguments[1];
+  });
+
+  const pluginParametersOf = (pluginName) => PluginManager.parameters(pluginName);
+
+  const pluginParameters = pluginParametersOf(pluginName);
+
+  const settings = {
+    weaponSortKeys: JSON.parse(pluginParameters.weaponSortKeys || '["id"]').map((e) => {
+      return String(e || ``);
+    }),
+    weaponOrder: String(pluginParameters.weaponOrder || `asc`),
+    armorSortKeys: JSON.parse(pluginParameters.armorSortKeys || '["id"]').map((e) => {
+      return String(e || ``);
+    }),
+    armorOrder: String(pluginParameters.armorOrder || `asc`),
+  };
+
+  const paramsKeyMap = {
+    mhp: 0,
+    mmp: 1,
+    atk: 2,
+    def: 3,
+    mat: 4,
+    mdf: 5,
+    agi: 6,
+    luk: 7,
+  };
+  function equipSortKeyMap(equip, key) {
+    switch (key) {
+      case 'mhp':
+      case 'mmp':
+      case 'atk':
+      case 'def':
+      case 'mat':
+      case 'mdf':
+      case 'agi':
+      case 'luk':
+        return equip.params[paramsKeyMap[key]];
+      case 'id':
+        return equip.orderId || equip.id;
+      default:
+        const result = DataManager.isWeapon(equip) ? equip[key] : equip[key];
+        return Number.isFinite(result) ? Number(result) : 0;
+    }
+  }
+  function compareEquip(a, b, keys) {
+    if (a === null && b === null) {
+      // 両方nullなら順不同
+      return 0;
+    } else if (a === null) {
+      return 1;
+    } else if (b === null) {
+      return -1;
+    }
+    const key = keys.shift();
+    const diff = equipSortKeyMap(a, key) - equipSortKeyMap(b, key);
+    if (diff === 0) {
+      return keys.length === 0 ? 0 : compareEquip(a, b, keys);
+    }
+    return diff;
+  }
+  function Window_OrderEquipMixIn(windowClass) {
+    windowClass.sortWeapons = function (weapons) {
+      return weapons.sort(
+        (a, b) => (settings.weaponOrder === 'desc' ? -1 : 1) * compareEquip(a, b, settings.weaponSortKeys.slice())
+      );
+    };
+    windowClass.sortArmors = function (armors) {
+      return armors.sort(
+        (a, b) => (settings.armorOrder === 'desc' ? -1 : 1) * compareEquip(a, b, settings.armorSortKeys.slice())
+      );
+    };
+  }
+  Window_OrderEquipMixIn(Window_Selectable.prototype);
+  /**
+   * @param {Window_ItemList.prototype} windowClass
+   */
+  function Window_ItemList_OrderEquipMixIn(windowClass) {
+    const _makeItemList = windowClass.makeItemList;
+    windowClass.makeItemList = function () {
+      _makeItemList.call(this);
+      this.sortEquips();
+    };
+    windowClass.sortEquips = function () {
+      if (this.isWeaponList()) {
+        this._data = this.sortWeapons(this._data);
+      } else if (this.isArmorList()) {
+        this._data = this.sortArmors(this._data);
+      }
+    };
+    windowClass.isWeaponList = function () {
+      return this._category === 'weapon';
+    };
+    windowClass.isArmorList = function () {
+      return this._category === 'armor';
+    };
+  }
+  Window_ItemList_OrderEquipMixIn(Window_ItemList.prototype);
+  /**
+   * @param {Window_EquipItem.prototype} windowClass
+   */
+  function Window_EquipItem_OrderEquipMixIn(windowClass) {
+    windowClass.isWeaponList = function () {
+      return this.etypeId() === 1;
+    };
+    windowClass.isArmorList = function () {
+      return this.etypeId() > 1;
+    };
+  }
+  Window_EquipItem_OrderEquipMixIn(Window_EquipItem.prototype);
+})();

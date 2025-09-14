@@ -1,0 +1,375 @@
+// DarkPlasma_FallImages 1.0.5
+// Copyright (c) 2020 DarkPlasma
+// This software is released under the MIT license.
+// http://opensource.org/licenses/mit-license.php
+
+/**
+ * 2024/02/08 1.0.5 TypeScript移行
+ *                  画像が降っていない状態で画像を消すコマンドを実行するとエラーになる不具合を修正
+ * 2021/07/05 1.0.4 MZ 1.3.2に対応
+ * 2021/06/22 1.0.3 サブフォルダからの読み込みに対応
+ * 2020/12/16 1.0.2 ゲーム終了時に正しく状態を初期化しない不具合を修正
+ * 2020/10/25 1.0.1 ヘルプ追記
+ * 2020/10/24 1.0.0 公開
+ */
+
+/*:
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+@plugindesc Drop images onto the screen
+@author DarkPlasma
+@license MIT
+
+@help
+English Help Translator: munokura
+Please check the URL below for the latest version of the plugin.
+URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+-----
+
+version: 1.0.5
+Provides a screen effect in which some kind of image falls.
+
+Set the ID and image file in the plugin parameters,
+and specify that ID in the plugin command.
+
+This plugin extends save data.
+It saves the state required for the image to fall.
+
+@param images
+@text Image Settings
+@desc Setting the image to be rained down
+@type struct<FallImage>[]
+@default []
+
+@command startFall
+@text Drop the image
+@desc Drops images onto the screen.
+@arg id
+@text Rain image setting ID
+@desc The ID of the image setting to be used for rain.
+@type number
+
+@command stopFall
+@text Erase an image
+@desc Erases and stops the falling images.
+
+@command fadeOutFall
+@text Fade out the image
+@desc Fades out the shaking image and stops it.
+*/
+
+/*:ja
+@plugindesc 画面内に画像を降らせる
+@author DarkPlasma
+@license MIT
+
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+
+@param images
+@desc 降らせる画像の設定
+@text 画像設定
+@type struct<FallImage>[]
+@default []
+
+@command startFall
+@text 画像を降らせる
+@desc 画像を画面内に降らせます。
+@arg id
+@text 降らせる画像設定ID
+@desc 降らせる画像設定のIDです。
+@type number
+
+@command stopFall
+@text 画像を消す
+@desc 降らせている画像を消し、止ませます。
+
+@command fadeOutFall
+@text 画像をフェードアウトする
+@desc 振らせている画像をフェードアウトさせ、止ませます。
+
+@help
+version: 1.0.5
+何らかの画像を降らせる画面演出を提供します。
+
+プラグインパラメータにIDと画像ファイルを設定し、
+プラグインコマンドでそのIDを指定してください。
+
+本プラグインはセーブデータを拡張します。
+画像を降らせるための状態をセーブします。
+*/
+
+(() => {
+  'use strict';
+
+  const pluginName = document.currentScript.src.replace(/^.*\/(.*).js$/, function () {
+    return arguments[1];
+  });
+
+  const command_startFall = 'startFall';
+
+  const command_stopFall = 'stopFall';
+
+  const command_fadeOutFall = 'fadeOutFall';
+
+  const pluginParametersOf = (pluginName) => PluginManager.parameters(pluginName);
+
+  const pluginParameters = pluginParametersOf(pluginName);
+
+  const settings = {
+    images: JSON.parse(pluginParameters.images || '[]').map((e) => {
+      return ((parameter) => {
+        const parsed = JSON.parse(parameter);
+        return {
+          id: Number(parsed.id || 1),
+          file: String(parsed.file || ``),
+          rows: Number(parsed.rows || 5),
+          cols: Number(parsed.cols || 18),
+          count: Number(parsed.count || 40),
+          waveringFrequency: Number(parsed.waveringFrequency || 7),
+          minimumLifeTime: Number(parsed.minimumLifeTime || 150),
+          lifeTimeRange: Number(parsed.lifeTimeRange || 500),
+          animationSpeed: Number(parsed.animationSpeed || 2),
+          moveSpeedX: Number(parsed.moveSpeedX || 4),
+          moveSpeedY: Number(parsed.moveSpeedY || 6),
+        };
+      })(e || '{}');
+    }),
+  };
+
+  const START_Y_OFFSET = -100;
+  PluginManager.registerCommand(pluginName, command_startFall, function (args) {
+    fallImageStatus?.requestStart(Number(args.id));
+  });
+  PluginManager.registerCommand(pluginName, command_stopFall, function () {
+    fallImageStatus?.requestStop();
+  });
+  PluginManager.registerCommand(pluginName, command_fadeOutFall, function () {
+    fallImageStatus?.requestFadeOut();
+  });
+  class FallImageStatus {
+    /**
+     * @param {boolean} startRequested 開始リクエストされているか
+     * @param {number} requestedImageId リクエストされている画像ID
+     * @param {boolean} stopRequested 停止リクエストされているか
+     * @param {boolean} fadeOutRequested フェードアウトリクエストされているか
+     * @param {boolean} isFalling 降っている最中か
+     */
+    constructor(startRequested, requestedImageId, stopRequested, fadeOutRequested, isFalling) {
+      this._startRequested = startRequested;
+      this._requestedImageId = requestedImageId;
+      this._stopRequested = stopRequested;
+      this._fadeOutRequested = fadeOutRequested;
+      this._isFalling = isFalling;
+    }
+    static newInstance() {
+      return new FallImageStatus(false, 0, false, false, false);
+    }
+    toSave() {
+      return {
+        startRequested: this.startRequested,
+        requestedImageId: this.requestedImageId,
+        stopRequested: this.stopRequested,
+        fadeOutRequested: this.fadeOutRequested,
+        isFalling: this.isFalling,
+      };
+    }
+    static fromSave(saveObject) {
+      return new FallImageStatus(
+        saveObject.startRequested,
+        saveObject.requestedImageId,
+        saveObject.stopRequested,
+        saveObject.fadeOutRequested,
+        saveObject.isFalling,
+      );
+    }
+    get startRequested() {
+      return this._startRequested;
+    }
+    get requestedImageId() {
+      return this._requestedImageId;
+    }
+    get stopRequested() {
+      return this._stopRequested;
+    }
+    get fadeOutRequested() {
+      return this._fadeOutRequested;
+    }
+    get isFalling() {
+      return this._isFalling;
+    }
+    requestedImageSetting() {
+      return settings.images.find((image) => image.id === this._requestedImageId);
+    }
+    requestStart(fallSettingId) {
+      this._startRequested = true;
+      this._requestedImageId = fallSettingId;
+      this._isFalling = true;
+    }
+    requestStop() {
+      this._stopRequested = true;
+      this._isFalling = false;
+    }
+    requestFadeOut() {
+      this._fadeOutRequested = true;
+      this._isFalling = false;
+    }
+    clearStartRequest() {
+      this._startRequested = false;
+    }
+    clearStopRequest() {
+      this._stopRequested = false;
+    }
+    clearFadeOutRequest() {
+      this._fadeOutRequested = false;
+    }
+  }
+  let fallImageStatus = null;
+  function Game_System_FallImageMixIn(gameSystem) {
+    const _initialize = gameSystem.initialize;
+    gameSystem.initialize = function () {
+      _initialize.call(this);
+      fallImageStatus = FallImageStatus.newInstance();
+    };
+    const _onBeforeSave = gameSystem.onBeforeSave;
+    gameSystem.onBeforeSave = function () {
+      _onBeforeSave.call(this);
+      if (fallImageStatus) {
+        this._fallImageStatus = fallImageStatus.toSave();
+      }
+    };
+    const _onAfterLoad = gameSystem.onAfterLoad;
+    gameSystem.onAfterLoad = function () {
+      _onAfterLoad.call(this);
+      if (this._fallImageStatus) {
+        fallImageStatus = FallImageStatus.fromSave(this._fallImageStatus);
+      } else {
+        fallImageStatus = FallImageStatus.newInstance();
+      }
+    };
+  }
+  Game_System_FallImageMixIn(Game_System.prototype);
+  class Sprite_Falling extends Sprite {
+    initialize(fallSettingId) {
+      super.initialize();
+      this._fallSetting = settings.images.find((image) => image.id === fallSettingId);
+      if (!this._fallSetting) {
+        throw new Error('Invalid fallSettingId.');
+      }
+      this.bitmap = ImageManager.loadBitmap('', this._fallSetting.file);
+    }
+    fallSetting() {
+      if (!this._fallSetting) {
+        throw new Error(`設定値が存在しません`);
+      }
+      return this._fallSetting;
+    }
+    setup() {
+      this.opacity = 255;
+      this.x = Math.floor(Math.random() * Graphics.boxWidth);
+      this.y = Math.floor(Math.random() * Graphics.boxHeight + START_Y_OFFSET);
+      this._lifeTime = this.initialLifeTime();
+      const scale = this.calcScale();
+      this.scale.set(scale, scale);
+      this._row = Math.randomInt(this.fallSetting().rows);
+      this._animationFrame = Math.randomInt(this.fallSetting().cols * this.fallSetting().animationSpeed);
+      this.updateFrame();
+    }
+    update() {
+      if (!this._fallSetting) {
+        throw new Error(`設定値が存在しません`);
+      }
+      this._lifeTime--;
+      this._animationFrame = (this._animationFrame + 1) % (this._fallSetting.cols * this._fallSetting.animationSpeed);
+      this.x += this.moveSpeedX();
+      this.y += this.moveSpeedY();
+      this.updateFrame();
+      this.updateLifeTime();
+    }
+    wavering() {
+      return Math.randomInt(10 - this.fallSetting().waveringFrequency + 1) === 0;
+    }
+    moveSpeedX() {
+      return (Math.randomInt(this.fallSetting().moveSpeedX) + 1) * (this.wavering() ? -1 : 1);
+    }
+    moveSpeedY() {
+      return Math.randomInt(this.fallSetting().moveSpeedY) + 1;
+    }
+    updateLifeTime() {
+      this._lifeTime--;
+      if (this._lifeTime <= 50) {
+        this.opacity -= 255 / 50;
+      }
+      if (this._lifeTime <= 0 && fallImageStatus?.isFalling) {
+        this.setup();
+      }
+    }
+    updateFrame() {
+      const width = this.frameWidth();
+      const height = this.frameHeight();
+      this.setFrame(
+        Math.floor(this._animationFrame / this.fallSetting().animationSpeed) * width,
+        this._row * height,
+        width,
+        height,
+      );
+    }
+    frameHeight() {
+      return Math.floor((this.bitmap?.height || 0) / this.fallSetting().rows);
+    }
+    frameWidth() {
+      return Math.floor((this.bitmap?.width || 0) / this.fallSetting().cols);
+    }
+    initialLifeTime() {
+      return this.fallSetting().minimumLifeTime + Math.floor(Math.random() * this.fallSetting().lifeTimeRange);
+    }
+    calcScale() {
+      return Math.randomInt(2) === 0 ? 0.5 : 1.5;
+    }
+  }
+  function Spriteset_Map_FallImagesMixIn(spritesetMap) {
+    const _initialize = spritesetMap.initialize;
+    spritesetMap.initialize = function () {
+      this._fallImageSprites = [];
+      _initialize.call(this);
+    };
+    const _createLowerLayer = spritesetMap.createLowerLayer;
+    spritesetMap.createLowerLayer = function () {
+      _createLowerLayer.call(this);
+      this.createFallImage();
+    };
+    spritesetMap.needCreateFallImage = function () {
+      return !!fallImageStatus?.startRequested || (!!fallImageStatus?.isFalling && this._fallImageSprites.length === 0);
+    };
+    spritesetMap.createFallImage = function () {
+      const image = fallImageStatus?.requestedImageSetting();
+      if (!image || !this.needCreateFallImage()) {
+        return;
+      }
+      fallImageStatus?.clearStartRequest();
+      this._fallImageSprites = [...Array(image.count).keys()].map((_) => new Sprite_Falling(image.id));
+      this._fallImageSprites.forEach((sprite) => {
+        this.addChild(sprite);
+        sprite.setup();
+      });
+    };
+    const _update = spritesetMap.update;
+    spritesetMap.update = function () {
+      _update.call(this);
+      this.updateFallImage();
+    };
+    spritesetMap.updateFallImage = function () {
+      if (fallImageStatus?.startRequested) {
+        this.createFallImage();
+      } else if (fallImageStatus?.stopRequested) {
+        this.destroyFallImages();
+      }
+    };
+    spritesetMap.destroyFallImages = function () {
+      this._fallImageSprites.forEach((sprite) => sprite.destroy());
+      this._fallImageSprites = [];
+      fallImageStatus?.clearStopRequest();
+    };
+  }
+  Spriteset_Map_FallImagesMixIn(Spriteset_Map.prototype);
+})();

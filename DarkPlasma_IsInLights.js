@@ -1,0 +1,153 @@
+// DarkPlasma_IsInLights 2.0.0
+// Copyright (c) 2024 DarkPlasma
+// This software is released under the MIT license.
+// http://opensource.org/licenses/mit-license.php
+
+/**
+ * 2025/08/15 2.0.0 DarkPlasma_DarkMap 3.0.0に対応
+ * 2024/02/23 1.0.0 公開
+ */
+
+/*:
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+@plugindesc Plugin command to determine whether you are in a light
+@author DarkPlasma
+@license MIT
+
+@help
+English Help Translator: munokura
+Please check the URL below for the latest version of the plugin.
+URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+-----
+
+version: 2.0.0
+This plugin provides a command to determine whether you are in a lighted area
+on a dark map and apply the results to a switch.
+
+This plugin requires the following plugin:
+DarkPlasma_DarkMap version: 3.0.0
+
+@command isInLights
+@text Determine if you are in the light
+@desc If you are in the light, turn on the specified switch.
+@arg switchId
+@text switch
+@desc Specify the switch to turn ON when the target is in the light.
+@type switch
+@default 0
+
+@arg target
+@text subject
+@desc Select the object to determine if it is in the light.
+@type select
+@default player
+@option Player
+@value player
+@option This event
+@value thisEvent
+@option Other events
+@value otherEvent
+
+@arg eventId
+@text Event ID
+@desc If the target is another event, specify the event ID.
+@type number
+@default 0
+*/
+
+/*:ja
+@plugindesc 明かりの中にいるかどうか判定するプラグインコマンド
+@author DarkPlasma
+@license MIT
+
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+
+@base DarkPlasma_DarkMap
+
+@command isInLights
+@text 明かりの中にいるか判定
+@desc 明かりの中にいる場合指定したスイッチをONにします。
+@arg switchId
+@desc 対象が明かりの中にいる場合ONにするスイッチを指定します。
+@text スイッチ
+@type switch
+@default 0
+@arg target
+@desc 明かりの中にいるかどうか判定する対象を選択します。
+@text 対象
+@type select
+@option プレイヤー
+@value player
+@option このイベント
+@value thisEvent
+@option 他のイベント
+@value otherEvent
+@default player
+@arg eventId
+@desc 対象が他のイベントの場合に、イベントIDを指定します。
+@text イベントID
+@type number
+@default 0
+
+@help
+version: 2.0.0
+暗いマップにおいて明かりの中にいるかどうか判定し、
+結果をスイッチに反映するプラグインコマンドを提供します。
+
+本プラグインの利用には下記プラグインを必要とします。
+DarkPlasma_DarkMap version:3.0.0
+*/
+
+(() => {
+  'use strict';
+
+  const pluginName = document.currentScript.src.replace(/^.*\/(.*).js$/, function () {
+    return arguments[1];
+  });
+
+  function parseArgs_isInLights(args) {
+    return {
+      switchId: Number(args.switchId || 0),
+      target: String(args.target || `player`),
+      eventId: Number(args.eventId || 0),
+    };
+  }
+
+  const command_isInLights = 'isInLights';
+
+  PluginManager.registerCommand(pluginName, command_isInLights, function (args) {
+    const parsedArgs = parseArgs_isInLights(args);
+    const target = (() => {
+      switch (parsedArgs.target) {
+        case 'player':
+          return $gamePlayer;
+        case 'thisEvent':
+          return this.character(0);
+        case 'otherEvent':
+          return this.character(parsedArgs.eventId);
+        default:
+          return null;
+      }
+    })();
+    $gameSwitches.setValue(parsedArgs.switchId, target?.isInLights() || false);
+  });
+  function Game_Map_IsInLightsMixIn(gameMap) {
+    gameMap.crowFlyDistance = function (x1, x2, y1, y2) {
+      return Math.sqrt(Math.pow(this.deltaX(x1, x2), 2) + Math.pow(this.deltaY(y1, y2), 2));
+    };
+  }
+  Game_Map_IsInLightsMixIn(Game_Map.prototype);
+  function Game_CharacterBase_IsInLightsMixIn(gameCharacterBase) {
+    gameCharacterBase.isInLights = function () {
+      return $gameMap.isDark() && $gameMap.lightEvents().some((event) => event.lightCovers(this.x, this.y));
+    };
+    gameCharacterBase.lightCovers = function (x, y) {
+      return (
+        this.isLightOn() && $gameMap.crowFlyDistance(this.x, x, this.y, y) * $gameMap.tileWidth() < this.lightRadius()
+      );
+    };
+  }
+  Game_CharacterBase_IsInLightsMixIn(Game_CharacterBase.prototype);
+})();

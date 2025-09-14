@@ -1,0 +1,459 @@
+// DarkPlasma_StateGroup 1.2.2
+// Copyright (c) 2020 DarkPlasma
+// This software is released under the MIT license.
+// http://opensource.org/licenses/mit-license.php
+
+/**
+ * 2025/08/11 1.2.2 非推奨化
+ * 2025/05/18 1.2.1 プラグインパラメータでグループ設定を行うと起動時にエラーで停止する不具合を修正
+ * 2022/10/15 1.2.0 DarkPlasma_StateBuffOnBattleStartにおけるグループに対する優位の挙動を定義
+ * 2022/10/10 1.1.1 typescript移行
+ * 2022/06/21 1.1.0 ステートを複数グループに所属させる
+ *                  グループに対する優位設定
+ * 2021/07/05 1.0.3 MZ 1.3.2に対応
+ * 2021/06/22 1.0.2 サブフォルダからの読み込みに対応
+ * 2020/09/08 1.0.1 rollup構成へ移行
+ * 2020/08/27 1.0.0 MZ版公開
+ */
+
+/*:
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+@plugindesc Grouping states
+@author DarkPlasma
+@license MIT
+
+@help
+English Help Translator: munokura
+Please check the URL below for the latest version of the plugin.
+URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+-----
+
+version: 1.2.2
+This plugin is deprecated.
+Its functionality has been taken over by DarkPlasma_PriorityStateGroup.
+Please use that plugin.
+
+Groups states.
+States belonging to the same group cannot be stacked.
+
+Group Definition
+This can be defined using plugin parameters.
+
+State Priority
+The order of settings in the plugin parameters determines the priority.
+(The lower the position, the higher the priority.)
+When applied to a state,
+it overwrites states with lower priority in the same group.
+
+Setting in the Memo Field
+
+Group Belonging
+<StateGroup: x>
+You can assign the target state to a group.
+(x is the group name)
+A single state can only have one tag with the same name.
+Each state can only belong to one group using the StateGroup memo tag.
+
+Priority Setting
+<StatePriority: x>
+Sets the priority within the group assigned by the StateGroup memo tag to x.
+The higher the number, the higher the priority.
+If you do not specify a StateGroup notetag, this notetag has no effect.
+If you specify a StateGroup notetag but not this notetag,
+the priority will be 0.
+
+Group Dominance
+<OverwriteStateGroup: x>
+When this state is applied, it will unconditionally overwrite the state of
+group x.
+When DarkPlasma_StateBuffOnBattleStart is used to start battle,
+if states A and B that overwrite each other are applied simultaneously,
+the behavior will be as follows:
+- If A and B are in the same group, only the state with the higher priority
+will be applied.
+- If A and B are not in the same group, only one of them will be applied.
+
+If using with the following plugins, add it below them.
+DarkPlasma_StateBuffOnBattleStart
+
+@param groups
+@text group
+@type struct<StateGroup>[]
+@default []
+*/
+
+/*:ja
+@plugindesc ステートをグルーピングする
+@author DarkPlasma
+@license MIT
+
+@target MZ
+@url https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+
+@orderAfter DarkPlasma_StateBuffOnBattleStart
+
+@param groups
+@text グループ
+@type struct<StateGroup>[]
+@default []
+
+@deprecated
+
+@help
+version: 1.2.2
+本プラグインは利用を非推奨とします。
+本プラグインの機能はDarkPlasma_PriorityStateGroupに引き継いでいます。
+そちらを利用するようにしてください。
+
+ステートをグルーピングします。
+同じグループに属するステートは重ねがけできません。
+
+グループの定義
+プラグインパラメータで定義できます。
+
+ステートの優先度
+プラグインパラメータによる設定の順番がそのまま優先度になります。
+（下にあるほど優先度が高い）
+あるステートにかかる際、
+同じグループのより優先度の低いステートを上書きします。
+
+メモ欄による設定
+
+グループへの所属
+<StateGroup: x>
+対象ステートをあるグループに所属させることができます。
+（xはグループ名）
+同名タグは単一のステートについてひとつずつしか設定できません。
+StateGroupメモタグで所属させることができるグループは
+ステートごとにひとつだけです。
+
+優先度の設定
+<StatePriority: x>
+StateGroupメモタグによって所属させたグループ内での優先度をxに設定します。
+数値が大きいほど優先度が高くなります。
+StateGroupメモタグを指定しない場合、本メモタグの効果はありません。
+StateGroupメモタグを指定し、本メモタグを指定しなかった場合、
+優先度は0になります。
+
+グループに対する優位
+<OverwriteStateGroup: x>
+そのステートにかかる際、グループxのステートを無条件で上書きします。
+DarkPlasma_StateBuffOnBattleStartで戦闘開始時に、
+互いを上書きするようなステートA,Bに同時にかかる場合の挙動は以下の通りです。
+- A,Bが同一グループに属している場合、優先度の高いステートのみかける
+- A,Bが同一グループに属していない場合、どちらか一方のみかける
+
+下記プラグインと共に利用する場合、それよりも下に追加してください。
+DarkPlasma_StateBuffOnBattleStart
+*/
+
+(() => {
+  'use strict';
+
+  const pluginName = document.currentScript.src.replace(/^.*\/(.*).js$/, function () {
+    return arguments[1];
+  });
+
+  const pluginParametersOf = (pluginName) => PluginManager.parameters(pluginName);
+
+  const pluginParameters = pluginParametersOf(pluginName);
+
+  const settings = {
+    groups: JSON.parse(pluginParameters.groups || '[]').map((e) => {
+      return ((parameter) => {
+        const parsed = JSON.parse(parameter);
+        return {
+          name: String(parsed.name || ``),
+          states: JSON.parse(parsed.states || '[]').map((e) => {
+            return Number(e || 0);
+          }),
+        };
+      })(e || '{}');
+    }),
+  };
+
+  function isState(data) {
+    return $dataStates && $dataStates.includes(data);
+  }
+
+  class StateAndPriority {
+    constructor(stateId, priority) {
+      this._stateId = stateId;
+      this._priority = priority;
+    }
+    /**
+     * @return {number}
+     */
+    get id() {
+      return this._stateId;
+    }
+    /**
+     * @return {number}
+     */
+    get priority() {
+      return this._priority;
+    }
+    /**
+     * @param {number} priority
+     */
+    setPriority(priority) {
+      this._priority = priority;
+    }
+    hasHigherPriority(other) {
+      return this.priority > other.priority;
+    }
+  }
+  class StateGroup {
+    constructor(name) {
+      this._name = name;
+      this._states = [];
+    }
+    /**
+     * @return {string}
+     */
+    get name() {
+      return this._name;
+    }
+    /**
+     * @return {StateAndPriority[]}
+     */
+    get states() {
+      return this._states;
+    }
+    /**
+     * @param {number} stateId
+     * @param {number} priority
+     */
+    addState(stateId, priority) {
+      if (this.priorityOf(stateId) === null) {
+        this.states.push(new StateAndPriority(stateId, priority));
+      } else {
+        // 設定済みの場合は上書きする
+        this.setPriorityOf(stateId, priority);
+      }
+    }
+    /**
+     * @param {number} stateId
+     * @return {boolean}
+     */
+    hasState(stateId) {
+      return this.states.some((state) => state.id === stateId);
+    }
+    /**
+     * @param {number} stateId
+     * @return {number[]}
+     */
+    higherOrEqualPriorityStateIds(stateId) {
+      const priority = this.priorityOf(stateId);
+      return priority === null
+        ? []
+        : this.states.filter((state) => state.priority >= priority).map((state) => state.id);
+    }
+    /**
+     * @param {number} stateId
+     * @return {number[]}
+     */
+    lowerPriorityStateIds(stateId) {
+      const priority = this.priorityOf(stateId);
+      return priority === null ? [] : this.states.filter((state) => state.priority < priority).map((state) => state.id);
+    }
+    higherPriorityStateIdIn(a, b) {
+      const priorityOfA = this.priorityOf(a);
+      const priorityOfB = this.priorityOf(b);
+      if (priorityOfA === null && priorityOfB === null) {
+        return null;
+      } else if (priorityOfB === null) {
+        return a;
+      } else if (priorityOfA === null) {
+        return b;
+      }
+      return priorityOfA > priorityOfB ? a : b;
+    }
+    /**
+     * 指定された配列の中で、グループ内で最も優先度の高いステートIDを返す
+     * グループ内に所属するステートIDが存在しない場合は0を返す
+     */
+    highestPriorityStateIdIn(stateIds) {
+      return stateIds.reduce((result, current) => {
+        return this.higherPriorityStateIdIn(result, current) || 0;
+      }, 0);
+    }
+    /**
+     * @param {number} stateId
+     * @return {number|null}
+     */
+    priorityOf(stateId) {
+      const targetState = this.states.find((state) => state.id === stateId);
+      return targetState ? targetState.priority : null;
+    }
+    /**
+     * @param {number} stateId
+     * @param {number} priority
+     */
+    setPriorityOf(stateId, priority) {
+      const targetState = this.states.find((state) => state.id === stateId);
+      if (!targetState) {
+        throw Error(`グループ ${this.name} にステート ${$dataStates[stateId].name} が存在しません。`);
+      }
+      targetState.setPriority(priority);
+    }
+  }
+  class StateGroupManager {
+    /**
+     * @return {StateGroup[]}
+     */
+    static initialStateGroup() {
+      return settings.groups.map((group) => {
+        const stateGroup = new StateGroup(group.name);
+        group.states.forEach((stateId, priority) => stateGroup.addState(stateId, priority));
+        return stateGroup;
+      });
+    }
+    static newGroup(name) {
+      const result = new StateGroup(name);
+      $dataStateGroups.push(result);
+      return result;
+    }
+    /**
+     * @param {string} groupName
+     * @param {number} stateId
+     * @param {number} priority
+     */
+    static addStateToGroup(groupName, stateId, priority) {
+      const targetGroup = this.groupByName(groupName) || this.newGroup(groupName);
+      targetGroup.addState(stateId, priority);
+    }
+    /**
+     * @param {number} stateId
+     * @return {StateGroup[]}
+     */
+    static groupListByState(stateId) {
+      return $dataStateGroups.filter((group) => group.hasState(stateId));
+    }
+    /**
+     * @param {string} name
+     * @return {StateGroup}
+     */
+    static groupByName(name) {
+      return $dataStateGroups.find((group) => group.name === name) || null;
+    }
+    /**
+     * ステート同士の優先度を比較する際に用いるグループ
+     */
+    static groupForComparePriority(stateIdA, stateIdB) {
+      return this.groupListByState(stateIdA).find((group) => group.hasState(stateIdB));
+    }
+  }
+  /**
+   * @type {StateGroup[]}
+   */
+  const $dataStateGroups = StateGroupManager.initialStateGroup();
+  /**
+   * @param {typeof DataManager} dataManager
+   */
+  function DataManager_StateGroupMixIn(dataManager) {
+    const _extractMetadata = dataManager.extractMetadata;
+    dataManager.extractMetadata = function (data) {
+      _extractMetadata.call(this, data);
+      if (isState(data)) {
+        if (data.meta.StateGroup) {
+          StateGroupManager.addStateToGroup(
+            String(data.meta.StateGroup),
+            data.id,
+            Number(data.meta.StatePriority || 0),
+          );
+        }
+      }
+    };
+  }
+  DataManager_StateGroupMixIn(DataManager);
+  /**
+   * @param {Game_Battler.prototype} gameBattler
+   */
+  function Game_Battler_StateGroupMixIn(gameBattler) {
+    const _addState = gameBattler.addState;
+    gameBattler.addState = function (stateId) {
+      /**
+       * 優先度の低い同グループステートにかかっている場合は上書き
+       */
+      const lowerPriorityStateIds = this.lowerOrEqualPriorityStateIds(stateId);
+      lowerPriorityStateIds.forEach((lowerPriorityStateId) => this.eraseState(lowerPriorityStateId));
+      /**
+       * グループ上書き設定
+       */
+      if ($dataStates[stateId].meta.OverwriteStateGroup) {
+        const group = StateGroupManager.groupByName(String($dataStates[stateId].meta.OverwriteStateGroup));
+        if (group) {
+          this.states()
+            .filter((state) => state.id !== stateId && group.hasState(state.id))
+            .forEach((state) => this.eraseState(state.id));
+        }
+      }
+      _addState.call(this, stateId);
+    };
+    const _isStateAddable = gameBattler.isStateAddable;
+    gameBattler.isStateAddable = function (stateId) {
+      // 優先度の高いか同じ同グループステートにかかっている場合はそのステートにかからない
+      return _isStateAddable.call(this, stateId) && !this.isHigherOrEqualPriorityStateAffected(stateId);
+    };
+    /**
+     * 同じグループに属する優先度の高いステートにかかっているかどうか
+     */
+    gameBattler.isHigherOrEqualPriorityStateAffected = function (stateId) {
+      return StateGroupManager.groupListByState(stateId).some((group) => {
+        return group
+          .higherOrEqualPriorityStateIds(stateId)
+          .some((id) => this.states().some((state) => state.id === id));
+      });
+    };
+    /**
+     * かかっているステートの中で、
+     * 指定したステートIDと同じグループに属する、優先度の低いステートID一覧を返す
+     * @param {number} stateId
+     * @return {number[]}
+     */
+    gameBattler.lowerOrEqualPriorityStateIds = function (stateId) {
+      return StateGroupManager.groupListByState(stateId)
+        .map((group) => {
+          return group.lowerPriorityStateIds(stateId).filter((id) => this.states().some((state) => state.id === id));
+        })
+        .flat();
+    };
+    const _statesOnBattleStart = gameBattler.statesOnBattleStart;
+    gameBattler.statesOnBattleStart = function () {
+      const statesOnBattleStart = _statesOnBattleStart.call(this);
+      return statesOnBattleStart.filter((stateOnBattleStart) => {
+        const groupA = StateGroupManager.groupByName(
+          String($dataStates[stateOnBattleStart.stateId].meta.OverwriteStateGroup),
+        );
+        if (groupA) {
+          /**
+           * ステートAはステートBの属するグループAを上書きする
+           * ステートAの属するグループBを上書きするようなステートBが同時にかかる場合、
+           * - ステートAとBが同一グループに属していれば、その中で優先度の高いほうのみをかける (両方とも複数の同一グループに属している場合、先に定義されたグループの優先度を用いる)
+           * - ステートAとBが同一グループに属していなければ、実装依存で片方のみかける (後で処理するほうが上書きする)
+           */
+          const groupBList = StateGroupManager.groupListByState(stateOnBattleStart.stateId);
+          return statesOnBattleStart
+            .filter((s) => {
+              const overWriteGroup = StateGroupManager.groupByName(
+                String($dataStates[s.stateId].meta.OverwriteStateGroup),
+              );
+              return overWriteGroup && groupBList.includes(overWriteGroup);
+            })
+            .map((s) => s.stateId)
+            .every((stateB) => {
+              const group = StateGroupManager.groupForComparePriority(stateOnBattleStart.stateId, stateB);
+              return (
+                !group ||
+                group.higherPriorityStateIdIn(stateOnBattleStart.stateId, stateB) === stateOnBattleStart.stateId
+              );
+            });
+        }
+        return true;
+      });
+    };
+  }
+  Game_Battler_StateGroupMixIn(Game_Battler.prototype);
+})();
