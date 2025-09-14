@@ -40,7 +40,7 @@ DarkPlasma_FilterEquip version: 0.0.5
 @text Feature Name
 @desc Specify the name of the feature to display when filtering.
 @type string
-@default 最近入手した装備
+@default Recently acquired equipment
 */
 
 /*:ja

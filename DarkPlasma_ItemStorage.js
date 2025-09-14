@@ -47,12 +47,12 @@ You can open the storage using the plugin command.
 @param partyItemCountText
 @text Number of texts you own
 @type string
-@default 所持している数
+@default Number of possessions
 
 @param storageItemCountText
 @text Number of texts in the warehouse
 @type string
-@default 倉庫に入っている数
+@default Number in the warehouse
 
 @command openStorage
 @text Open a warehouse

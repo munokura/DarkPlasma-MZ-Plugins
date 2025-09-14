@@ -34,7 +34,7 @@ Inflicts a penalty on successful escape.
 @text Dropped Message
 @desc Message when money is dropped. {gold} is the amount of money dropped, and {unit} is the unit of money.
 @type string
-@default {gold}{unit}落としてしまった！
+@default I lost {gold}{unit}!
 */
 
 /*:ja

@@ -40,7 +40,7 @@ This app does not support browser play.
 @param tweetText
 @text Tweet
 @type multiline_string
-@default 今日はこのRPGをやってるよ！\n#RPGツクールMZ
+@default I'm playing this RPG today! \n#RPG Maker MZ
 
 @command tweetScreenshot
 @text Tweet a screenshot

@@ -47,7 +47,7 @@ forced replacement will not occur during battles on that map.
 @text Forced swap message
 @desc Message when forcibly replacing
 @type string
-@default 倒れた前衛に代わって後衛が戦闘に加わった！
+@default The rear guard has joined the battle in place of the fallen vanguard!
 
 @param forceFormationCommonEvent
 @text Common events during forced swaps
