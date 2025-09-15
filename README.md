@@ -1,0 +1,4 @@
+- English Help Translator: munokura
+- This is an unofficial English translation of the plugin help, created to support global RPG Maker users.
+- Original plugin by DarkPlasma.
+- Please check the latest official version at: https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
