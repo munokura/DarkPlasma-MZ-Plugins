@@ -16,8 +16,11 @@
 
 @help
 English Help Translator: munokura
-Please check the URL below for the latest version of the plugin.
-URL https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
+This is an unofficial English translation of the plugin help,
+created to support global RPG Maker users.
+Original plugin by DarkPlasma.
+Please check the latest official version at:
+https://github.com/elleonard/DarkPlasma-MZ-Plugins/tree/release
 -----
 
 version: 1.0.0
@@ -51,7 +54,7 @@ DarkPlasma_CustomKeyHandler
 @text Registration message
 @desc A message will be displayed when you register an item on your wishlist.
 @type multiline_string
-@default {item}をウィッシュリストに登録しました。
+@default You have added {item} to your wishlist.
 */
 
 /*:ja
