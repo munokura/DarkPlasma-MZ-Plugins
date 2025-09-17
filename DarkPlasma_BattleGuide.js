@@ -102,7 +102,7 @@ DarkPlasma_ManualText
 @param partyCommandName
 @text Party Command Name
 @type string
-@default 手引書
+@default Guide
 */
 
 /*:ja

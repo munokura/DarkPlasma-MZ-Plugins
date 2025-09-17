@@ -45,7 +45,7 @@ TorigoyaMZ_NotifyMessage
 @text Notice text
 @desc Set the notification text. {item} will be replaced with the name of the deliverable item.
 @type string
-@default {item}の素材が揃いました。
+@default You have gathered all the materials for {item}.
 */
 
 /*:ja

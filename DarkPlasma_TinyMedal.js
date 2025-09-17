@@ -94,17 +94,17 @@ reward acquisition status will be reset in save data from 2.x or earlier.
 @param medalUnit
 @text Medal units
 @type string
-@default 枚
+@default pieces
 
 @param numMedalLabel
 @text Owned medal label
 @type string
-@default 所持メダル
+@default Owned medal
 
 @param totalMedalLabel
 @text Deposited medal label
 @type string
-@default 預けたメダル
+@default Deposited medal
 
 @param rewardItems
 @text Reward items
@@ -124,7 +124,7 @@ reward acquisition status will be reset in save data from 2.x or earlier.
 @param rewardMessages
 @text Reward Message
 @type struct<RewardMessage>[]
-@default ["{\"message\":\"メダルを${medalCount}個集めた。\\n「${itemName}」を手に入れた！\",\"faceFile\":\"\",\"faceIndex\":\"0\"}"]
+@default ["{\"message\":\"Collected ${medalCount} medals.\\nI got "${itemName}"!\",\"faceFile\":\"\",\"faceIndex\":\"0\"}"]
 
 @param migrateV2ToV3
 @text Converting save data from 2.x

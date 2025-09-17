@@ -38,7 +38,7 @@ This plugin cannot be used on Game Atsumaru.
 @param optionName
 @text Setting item name
 @type string
-@default 全体 音量
+@default Master Volume
 
 @param defaultVolume
 @text Initial Value

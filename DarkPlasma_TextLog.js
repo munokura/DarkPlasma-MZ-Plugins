@@ -110,7 +110,7 @@ $gameTemp.requestCallTextLogOnMap();
 @text Choice Format
 @desc Sets the format for the choices displayed in the log. {choice} will be converted to the selected choice.
 @type string
-@default 選択肢:{choice}
+@default Choice:{choice}
 
 @param choiceColor
 @text Choice color
@@ -122,7 +122,7 @@ $gameTemp.requestCallTextLogOnMap();
 @text Cancellation Log
 @desc Sets what to record when a choice is cancelled.
 @type string
-@default キャンセル
+@default Cancel
 
 @param smoothBackFromLog
 @text No text redisplay

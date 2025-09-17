@@ -58,19 +58,19 @@ repository.
 @text Empty text
 @desc Sets the text to display when the wishlist is empty.
 @type string
-@default ウィッシュリストに何も登録されていません
+@default You have nothing on your wishlist
 
 @param resultLabel
 @text Deliverable Label
 @desc Set the label for the artifact to display in the wishlist.
 @type string
-@default 成果物
+@default Deliverable
 
 @param materialLabel
 @text Material label
 @desc Set the label for the material to be displayed in the wishlist.
 @type string
-@default 素材
+@default Material
 
 @command sceneWishList
 @text Open Wishlist

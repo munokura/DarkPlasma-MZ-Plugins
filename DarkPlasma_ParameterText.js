@@ -40,94 +40,94 @@ TextManager.xparam(Additional Ability ID)
 TextManager.sparam(Special Ability ID)
 
 @param extraParamNameCritical
-@text Critical Hit Rate Notation
+@text Critical Hit Rate notation
 @type string
-@default 会心率
+@default Critical Hit Rate
 
 @param extraParamNameCriticalEvasion
 @text Critical hit evasion rate notation
 @type string
-@default 会心回避率
+@default Critical hit evasion rate
 
 @param extraParamNameMagicEvasion
 @text Magic evasion rate notation
 @type string
-@default 魔法回避率
+@default Magic evasion rate
 
 @param extraParamNameMagicReflection
-@text Magic Reflectance Notation
+@text Magic Reflectance notation
 @type string
-@default 魔法反射率
+@default Magic Reflectance
 
 @param extraParamNameCounterAttack
 @text Counterattack rate notation
 @type string
-@default 反撃率
+@default Counterattack rate
 
 @param extraParamNameHpRegeneration
-@text HP playback rate display
+@text HP playback rate display notation
 @type string
-@default HP再生率
+@default HP playback rate
 
 @param extraParamNameMpRegeneration
-@text MP Regeneration Rate
+@text MP Regeneration rate notation
 @type string
-@default MP再生率
+@default MP Regeneration rate
 
 @param extraParamNameTpRegeneration
-@text TP Regeneration Rate Notation
+@text TP Regeneration Rate notation
 @type string
-@default TP再生率
+@default TP Regeneration Rate
 
 @param specialParamNameTargetRate
 @text Target rate notation
 @type string
-@default 狙われ率
+@default Target rate
 
 @param specialParamNameGuardEffectRate
 @text Defense effectiveness rate notation
 @type string
-@default 防御効果率
+@default Defense effectiveness rate
 
 @param specialParamNameRecoveryEffectRate
 @text Recovery effect rate notation
 @type string
-@default 回復効果率
+@default Recovery effect rate
 
 @param specialParamNamePharmacology
 @text Drug knowledge notation
 @type string
-@default 薬の知識
+@default Drug knowledge
 
 @param specialParamNameMpCostRate
 @text MP consumption rate notation
 @type string
-@default MP消費率
+@default MP consumption rate
 
 @param specialParamNameTpChargeRate
 @text TP charge rate notation
 @type string
-@default TPチャージ率
+@default TP charge rate
 
 @param specialParamNamePhysicalDamageRate
 @text Physical damage rate notation
 @type string
-@default 物理ダメージ率
+@default Physical damage rate
 
 @param specialParamNameMagicDamageRate
 @text Magic damage rate notation
 @type string
-@default 魔法ダメージ率
+@default Magic damage rate
 
 @param specialParamNameFloorDamageRate
 @text Floor damage rate notation
 @type string
-@default 床ダメージ率
+@default Floor damage rate
 
 @param specialParamNameExperienceRate
-@text Experience Gain Rate Notation
+@text Experience Gain Rate notation
 @type string
-@default 経験獲得率
+@default Experience Gain Rate
 */
 
 /*:ja
